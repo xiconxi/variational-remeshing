@@ -1,0 +1,3 @@
+[submodule "extern/voronoi"]
+	path = extern/voronoi
+	url = https://github.com/JCash/voronoi
