@@ -46,7 +46,31 @@ int main(int argc, char *argv[])
     remesher.lscm_parameterization();
     remesher.compute_local_density();
     remesher.initial_sampling(100);
-    remesher.lloyd_relaxation(1);
+
+
+    Eigen::MatrixX3d UVD(V.rows(), 3);
+
+    UVD.leftCols(2) = remesher.UV_;
+    UVD.col(2) = (( remesher.density_.array()+1).log()+1).log();
+
+    std::cout << remesher.density_ << std::endl;
+    // Plot the mesh
+    igl::opengl::glfw::Viewer viewer;
+    viewer.data().set_mesh(UVD, F);
+//    viewer.data().set_uv(V_uv);
+    viewer.callback_key_down = &key_down;
+
+    // Disable wireframe
+    viewer.data().show_lines = false;
+
+    // Draw checkerboard texture
+    viewer.data().show_texture = true;
+
+    // Launch the viewer
+    viewer.launch();
+
+
+//    remesher.lloyd_relaxation(1);
 
     return 0;
 
@@ -65,18 +89,18 @@ int main(int argc, char *argv[])
     // Scale UV to make the texture more clear
     V_uv *= 5;
 
-    // Plot the mesh
-    igl::opengl::glfw::Viewer viewer;
-    viewer.data().set_mesh(V, F);
-    viewer.data().set_uv(V_uv);
-    viewer.callback_key_down = &key_down;
-
-    // Disable wireframe
-    viewer.data().show_lines = false;
-
-    // Draw checkerboard texture
-    viewer.data().show_texture = true;
-
-    // Launch the viewer
-    viewer.launch();
+//    // Plot the mesh
+//    igl::opengl::glfw::Viewer viewer;
+//    viewer.data().set_mesh(V, F);
+//    viewer.data().set_uv(V_uv);
+//    viewer.callback_key_down = &key_down;
+//
+//    // Disable wireframe
+//    viewer.data().show_lines = false;
+//
+//    // Draw checkerboard texture
+//    viewer.data().show_texture = true;
+//
+//    // Launch the viewer
+//    viewer.launch();
 }

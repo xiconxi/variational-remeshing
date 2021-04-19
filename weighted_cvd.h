@@ -32,9 +32,9 @@ public:
     }
 
     // density over a convex polygon which is the overlap part of the triangle and voronoi cell
-    double density_integral(Eigen::MatrixX2d& poly, Eigen::VectorXd d);
+    std::pair<Eigen::Vector2d, double> density_integral(Eigen::MatrixX2d& poly, Eigen::VectorXd& d);
 
-private:
+//private:
     Eigen::MatrixXd UV_;
     Eigen::MatrixX2d samples_;
     Eigen::VectorXd density_;

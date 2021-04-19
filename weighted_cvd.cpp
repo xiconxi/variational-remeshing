@@ -32,9 +32,10 @@ void VariationalRemesher::lscm_parameterization() {
 
 
 void VariationalRemesher::compute_local_density() {
-    Eigen::SparseMatrix<double> mass;
-    igl::massmatrix(V_, F_, igl::MASSMATRIX_TYPE_VORONOI, mass);
-    density_ = mass.diagonal();
+    Eigen::SparseMatrix<double> mass1, mass2;
+    igl::massmatrix(V_, F_, igl::MASSMATRIX_TYPE_VORONOI, mass1);
+    igl::massmatrix(UV_, F_, igl::MASSMATRIX_TYPE_VORONOI, mass2);
+    density_ = mass1.diagonal().array()/mass2.diagonal().array();
 }
 
 void VariationalRemesher::initial_sampling(size_t n_sample) {
@@ -47,8 +48,20 @@ void VariationalRemesher::initial_sampling(size_t n_sample) {
     }
 }
 
-double VariationalRemesher::density_integral(Eigen::MatrixX2d& poly, Eigen::VectorXd d) {
+std::pair<Eigen::Vector2d, double> density_integral(Eigen::MatrixX2d& poly, Eigen::VectorXd& d) {
+    double mean_0 = poly.col(0).dot(d)/d.mean();
+    double mean_1 = poly.col(1).dot(d)/d.mean();
+    double area = 0;
+    Eigen::Vector3d v0 , v1;
+    v0.setZero();
+    v1.setZero();
+    for(int i = 1; i < poly.size() -1; i++) {
+        v0.topRows(2) = poly.row(i) - poly.row(0);
+        v1.topRows(2) = poly.row(i+1) - poly.row(0);
+        area += v0.cross(v1).norm();
+    }
 
+    return {Eigen::Vector2d(mean_0, mean_1), area};
 }
 
 void VariationalRemesher::lloyd_relaxation(size_t n_iters) {
@@ -70,25 +83,42 @@ void VariationalRemesher::lloyd_relaxation(size_t n_iters) {
     clip.reserve(10);
     igl::AABB<Eigen::MatrixXd, 2> tree;
     tree.init(UV_, F_);
-    Eigen::VectorXd sqrD;
-    Eigen::VectorXi I;
-    Eigen::MatrixXd C, P;
     for(int i = 0; i < diagram.numsites; i++) {
         clip.clear();
         for(auto e = sites[i].edges; e; e = e->next)
             clip.push_back(e->pos[0].x+e->pos[0].y*1.0i);
+
+        Eigen::Vector2d centroid, centroid_sum;
+        double weight = 0, weight_sum = 0;
+
+        Eigen::VectorXd sqrD;
+        Eigen::VectorXi FI;
+        Eigen::MatrixXd C, P;
+
+        centroid_sum.setZero();
         for(int fi = 0; fi < F_.rows(); fi++) {
             subj[0] = V[F_(fi, 0)];
             subj[1] = V[F_(fi, 1)];
             subj[2] = V[F_(fi, 2)];
+            // clip the triangle with voronoi cell: subj&clip -> solution
             clipping_sutherland_hodgman(subj, clip, solution);
             if(solution.size() == 0) continue;
+
             P.resize(solution.size(), 2);
             for(int s_i = 0; s_i < P.rows(); s_i++) {
                 P(s_i, 0) = solution[s_i].real();
                 P(s_i, 1) = solution[s_i].imag();
             }
-            tree.squared_distance(UV_, F_, P, sqrD, I, C);
+
+            //compute the barycentric coord of the voronoi sites -> C
+            tree.squared_distance(UV_, F_, P, sqrD, FI, C);
+            Eigen::VectorXd d(FI.size());
+            for(int k = 0; k < d.size(); k++)
+                d[k] = density(FI[k], C.row(k));
+
+
+
+
             std::cout << sqrD.transpose() << std::endl;
         }
     }
